@@ -155,12 +155,6 @@
       border: 1px solid #f5c2c7;
     }
 
-    .small-note {
-      font-size: 12px;
-      color: #666;
-      margin-top: 6px;
-    }
-
     @media (max-width: 768px) {
       .grid, .image-grid {
         grid-template-columns: 1fr;
@@ -218,8 +212,8 @@
       </div>
 
       <div>
-        <label for="barcode">Barcode *</label>
-        <input type="text" id="barcode" placeholder="Enter or generate barcode" />
+        <label for="barcode">Barcode</label>
+        <input type="text" id="barcode" placeholder="Enter or auto-generate on submit" />
       </div>
 
       <div>
@@ -228,8 +222,8 @@
       </div>
 
       <div>
-        <label for="sku">SKU *</label>
-        <input type="text" id="sku" placeholder="Enter or generate SKU" />
+        <label for="sku">SKU</label>
+        <input type="text" id="sku" placeholder="Enter or auto-generate on submit" />
       </div>
 
       <div>
@@ -263,9 +257,9 @@
 
   <script>
     // ===============================
-    // YOUR MAKE WEBHOOK (ALREADY ADDED)
+    // YOUR LATEST MAKE WEBHOOK
     // ===============================
-    const WEBHOOK_URL = "https://hook.eu1.make.com/7kiwlxh3jmarlfa0n3ot1zy2a9vk2gkc";
+    const WEBHOOK_URL = "https://hook.eu1.make.com/8if4qnhgeayp7gjo2vtn8oodvhy02bsf";
 
     let imageData = {
       image1: null,
@@ -282,7 +276,6 @@
     }
 
     function generateBarcode() {
-      // 13-digit barcode style
       const barcode = "89" + Math.floor(10000000000 + Math.random() * 90000000000).toString();
       document.getElementById("barcode").value = barcode.slice(0, 13);
     }
@@ -354,14 +347,12 @@
         return;
       }
 
-      // Auto-generate barcode if empty
       if (!barcode) {
         barcode = "89" + Math.floor(10000000000 + Math.random() * 90000000000).toString();
         barcode = barcode.slice(0, 13);
         document.getElementById("barcode").value = barcode;
       }
 
-      // Auto-generate SKU if empty
       if (!sku) {
         let prefix = productName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase() || "PRD";
         const randomPart = Math.floor(1000 + Math.random() * 9000);
@@ -433,4 +424,4 @@
     }
   </script>
 </body>
-  </html>
+</html>
