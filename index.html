@@ -18,7 +18,7 @@
     }
 
     .container {
-      max-width: 900px;
+      max-width: 950px;
       margin: 30px auto;
       background: #fff;
       padding: 25px;
@@ -102,7 +102,7 @@
     .preview-box {
       margin-top: 8px;
       width: 100%;
-      height: 150px;
+      height: 160px;
       border: 2px dashed #ccc;
       border-radius: 10px;
       display: flex;
@@ -153,6 +153,12 @@
       background: #fdecec;
       color: #b42318;
       border: 1px solid #f5c2c7;
+    }
+
+    .small-note {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
     }
 
     @media (max-width: 768px) {
@@ -213,7 +219,7 @@
 
       <div>
         <label for="barcode">Barcode</label>
-        <input type="text" id="barcode" placeholder="Enter or auto-generate on submit" />
+        <input type="text" id="barcode" placeholder="Enter or auto-generate" />
       </div>
 
       <div>
@@ -223,7 +229,7 @@
 
       <div>
         <label for="sku">SKU</label>
-        <input type="text" id="sku" placeholder="Enter or auto-generate on submit" />
+        <input type="text" id="sku" placeholder="Enter or auto-generate" />
       </div>
 
       <div>
@@ -250,23 +256,19 @@
       </div>
     </div>
 
-    <button class="btn submit-btn" onclick="submitProduct()">Submit Product</button>
+    <button class="btn submit-btn" onclick="submitProduct()">Upload Product</button>
+    <div class="small-note">Uploads images to Cloudinary first, then sends image URLs + product data to Make.com</div>
 
     <div id="statusMessage" class="status"></div>
   </div>
 
   <script>
-    // ===============================
-    // YOUR LATEST MAKE WEBHOOK
-    // ===============================
+    // =========================
+    // CONFIG
+    // =========================
+    const CLOUD_NAME = "ddff5thvj";
+    const UPLOAD_PRESET = "product_upload"; // IMPORTANT: create this in Cloudinary as UNSIGNED
     const WEBHOOK_URL = "https://hook.eu1.make.com/8if4qnhgeayp7gjo2vtn8oodvhy02bsf";
-
-    let imageData = {
-      image1: null,
-      image2: null,
-      image3: null,
-      image4: null
-    };
 
     function showStatus(message, type) {
       const status = document.getElementById("statusMessage");
@@ -289,43 +291,56 @@
       }
 
       const randomPart = Math.floor(1000 + Math.random() * 9000);
-      const sku = `${prefix}-${randomPart}`;
-      document.getElementById("sku").value = sku;
+      document.getElementById("sku").value = `${prefix}-${randomPart}`;
     }
 
-    function handleImageUpload(inputId, previewId, key) {
+    function setupPreview(inputId, previewId) {
       const input = document.getElementById(inputId);
       const preview = document.getElementById(previewId);
 
       input.addEventListener("change", function () {
         const file = input.files[0];
         if (!file) {
-          imageData[key] = null;
           preview.innerHTML = '<div class="preview-placeholder">No image selected</div>';
           return;
         }
 
         const reader = new FileReader();
-
         reader.onload = function (e) {
-          const base64 = e.target.result;
-          imageData[key] = {
-            name: file.name,
-            type: file.type,
-            data: base64
-          };
-
-          preview.innerHTML = `<img src="${base64}" alt="Preview">`;
+          preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
         };
-
         reader.readAsDataURL(file);
       });
     }
 
-    handleImageUpload("image1", "preview1", "image1");
-    handleImageUpload("image2", "preview2", "image2");
-    handleImageUpload("image3", "preview3", "image3");
-    handleImageUpload("image4", "preview4", "image4");
+    setupPreview("image1", "preview1");
+    setupPreview("image2", "preview2");
+    setupPreview("image3", "preview3");
+    setupPreview("image4", "preview4");
+
+    async function uploadToCloudinary(file) {
+      if (!file) return "";
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", UPLOAD_PRESET);
+
+      const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.secure_url) {
+        console.error("Cloudinary error:", data);
+        throw new Error("Cloudinary upload failed");
+      }
+
+      return data.secure_url;
+    }
 
     async function submitProduct() {
       const productName = document.getElementById("productName").value.trim();
@@ -337,12 +352,17 @@
       const width = document.getElementById("width").value.trim();
       const weight = document.getElementById("weight").value.trim();
 
+      const file1 = document.getElementById("image1").files[0];
+      const file2 = document.getElementById("image2").files[0];
+      const file3 = document.getElementById("image3").files[0];
+      const file4 = document.getElementById("image4").files[0];
+
       if (!productName || !costPrice || !maxPrice) {
         showStatus("Please fill Product Name, Cost Price, and Max Selling Price.", "error");
         return;
       }
 
-      if (!imageData.image1) {
+      if (!file1) {
         showStatus("Please upload at least Image 1.", "error");
         return;
       }
@@ -360,25 +380,32 @@
         document.getElementById("sku").value = sku;
       }
 
-      showStatus("Uploading product... Please wait.", "success");
-
-      const payload = {
-        productName,
-        costPrice,
-        maxPrice,
-        barcode,
-        sku,
-        height,
-        width,
-        weight,
-        image1: imageData.image1,
-        image2: imageData.image2,
-        image3: imageData.image3,
-        image4: imageData.image4,
-        submittedAt: new Date().toISOString()
-      };
-
       try {
+        showStatus("Uploading images to Cloudinary... Please wait.", "success");
+
+        const image1Url = await uploadToCloudinary(file1);
+        const image2Url = await uploadToCloudinary(file2);
+        const image3Url = await uploadToCloudinary(file3);
+        const image4Url = await uploadToCloudinary(file4);
+
+        showStatus("Sending product data to Make.com...", "success");
+
+        const payload = {
+          productName,
+          costPrice,
+          maxPrice,
+          barcode,
+          sku,
+          height,
+          width,
+          weight,
+          image1Url,
+          image2Url,
+          image3Url,
+          image4Url,
+          submittedAt: new Date().toISOString()
+        };
+
         const response = await fetch(WEBHOOK_URL, {
           method: "POST",
           headers: {
@@ -395,7 +422,7 @@
         clearForm();
       } catch (error) {
         console.error(error);
-        showStatus("Upload failed. Check webhook, Make scenario, or internet connection.", "error");
+        showStatus("Upload failed. Check Cloudinary preset, Make scenario, or internet connection.", "error");
       }
     }
 
@@ -414,13 +441,6 @@
         document.getElementById("preview" + (index + 1)).innerHTML =
           '<div class="preview-placeholder">No image selected</div>';
       });
-
-      imageData = {
-        image1: null,
-        image2: null,
-        image3: null,
-        image4: null
-      };
     }
   </script>
 </body>
